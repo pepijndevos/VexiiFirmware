@@ -1,0 +1,18 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "hoc",
+            "displayName": "HOC",
+            "description": "Sets Ninja generator, build and install directory",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "MinSizeRel",
+                "SOC": "microsoc/default",
+                "DEVICE": "microsoc_sim",
+                "TOOLCHAIN_PATH": "/opt/xpack/riscv-none-elf-gcc/bin/"
+            }
+        }
+    ]
+}

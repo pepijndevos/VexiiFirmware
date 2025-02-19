@@ -28,7 +28,7 @@ function(_find_tool VAR_NAME BINARY_NAME)
 endfunction()
 
 # Find tools
-set(PREFIX "riscv64-unknown-elf")
+set(PREFIX "riscv-none-elf")
 _find_tool(BIN_COMPILER_C       ${PREFIX}-gcc)
 _find_tool(BIN_COMPILER_CXX     ${PREFIX}-g++)
 _find_tool(BIN_COMPILER_ASM     ${PREFIX}-gcc)

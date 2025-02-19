@@ -1,4 +1,4 @@
-set(RV_ARCH "rv32i")
-set(RV_ABI "ilp32")
+set(RV_ARCH "rv64i")
+set(RV_ABI "lp64")
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/system)
