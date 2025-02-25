@@ -4,7 +4,6 @@
 //#include <stdatomic.h>
 #include <string.h>
 //#include <time.h>
-#include <bit>
 #include <system/soc.hpp>
 
 void myprint(std::string_view str) {
@@ -14,11 +13,9 @@ void myprint(std::string_view str) {
 typedef uint8_t  Tag;  //  8 bits
 typedef uint32_t Lab;  // 24 bits
 typedef uint32_t Loc;  // 32 bits
-typedef struct {
-    uint32_t upper; // loc
-    uint32_t lower; // lab and tag combined
-} Term;
+typedef uint64_t Term; // Loc | Lab | Tag
 typedef uint32_t u32;
+typedef uint64_t u64;
 typedef int32_t  i32;
 typedef float    f32;
 
@@ -39,8 +36,7 @@ typedef float    f32;
 #define F32 0x0E // float literal
 #define MAT 0x0F // match
 
-#define VOID 0x00
-#define VOID_TERM {0, 0}
+#define VOID 0
 
 // Operators
 #define OP_ADD 0x00
@@ -61,24 +57,24 @@ typedef float    f32;
 #define OP_RSH 0x0F
 
 // Types
-//typedef uint64_t a64;
+typedef uint64_t a64;
 //typedef _Atomic(u64) a64;
 
 // Global heap
-static Term BUFF[1024];
-static u32  RNOD_INI = 0;
-static u32  RNOD_END = 0;
-static u32  RBAG     = 256; //0x1000;
-static u32  RBAG_INI = 0;
-static u32  RBAG_END = 0;
+static a64 BUFF[1024];
+static u64  RNOD_INI = 0;
+static u64  RNOD_END = 0;
+static u64  RBAG     = 256; //0x1000;
+static u64  RBAG_INI = 0;
+static u64  RBAG_END = 0;
 
 // Global book
 typedef struct Def {
   const char* name;
   Term* nodes;
-  u32 nodes_len;
+  u64 nodes_len;
   Term* rbag;
-  u32 rbag_len;
+  u64 rbag_len;
 } Def;
 
 typedef struct Book {
@@ -99,22 +95,23 @@ void dump_buff();
 
 // Term operations
 Term term_new(Tag tag, Lab lab, Loc loc) {
-    Term term;
-    term.lower = tag | (lab << 8);
-    term.upper = loc;
-    return term;
+  Term tag_enc = tag;
+  Term lab_enc = ((Term)lab) << 8;
+  Term loc_enc = ((Term)loc) << 32;
+
+  return loc_enc | lab_enc | tag_enc;
 }
 
 Tag term_tag(Term term) {
-    return term.lower & 0xFF;
+  return term & 0xFF;
 }
 
 Lab term_lab(Term term) {
-    return (term.lower >> 8) & 0xFFFFFF;
+  return (term >> 8) & 0xFFFFFF;
 }
 
 Loc term_loc(Term term) {
-    return term.upper;
+  return (term >> 32) & 0xFFFFFFFF;
 }
 
 Term term_offset_loc(Term term, Loc offset) {
@@ -129,9 +126,9 @@ Term term_offset_loc(Term term, Loc offset) {
       return term;
   }
 
-  Tag tag = term_tag(term);
-  Lab lab = term_lab(term);
-  Loc loc = term_loc(term) + offset;
+  Term tag = term_tag(term);
+  Term lab = term_lab(term);
+  Term loc = term_loc(term) + offset;
 
   return term_new(tag, lab, loc);
 }
@@ -152,7 +149,7 @@ Term get(Loc loc) {
 Term take(Loc loc) {
   //return atomic_exchange_explicit(&BUFF[loc], VOID, memory_order_relaxed);
   Term ret = BUFF[loc];
-  BUFF[loc] = VOID_TERM;
+  BUFF[loc] = VOID;
   return ret;
 }
 
@@ -161,18 +158,18 @@ void set(Loc loc, Term term) {
   BUFF[loc] = term;
 }
 
-Loc port(u32 n, Loc x) {
+Loc port(u64 n, Loc x) {
   return n + x - 1;
 }
 
 // Allocation
-Loc alloc_node(u32 arity) {
+Loc alloc_node(u64 arity) {
   Loc loc = RNOD_END;
   RNOD_END += arity;
   return loc;
 }
 
-u32 inc_itr() {
+u64 inc_itr() {
   return RBAG_END / 2;
 }
 
@@ -258,7 +255,7 @@ Term expand_ref(Loc def_idx) {
   if (RNOD_END == 0) {
     myprint("expand_ref: empty BUFF\n");
     //exit(1);
-    return VOID_TERM;
+    return VOID;
   }
 
   Def def = BOOK.defs[def_idx];
@@ -282,7 +279,7 @@ Term expand_ref(Loc def_idx) {
 
 
 // Atomic Linker
-static void move(Loc neg_loc, Term pos);
+static void move(Loc neg_loc, u64 pos);
 
 static void link(Term neg, Term pos) {
   if (term_tag(pos) == VAR) {
@@ -395,10 +392,10 @@ static void interact_opynul(Loc a_loc) {
 
 // Utilities
 u32 u32_to_u32(u32 u) { return         u; }
-i32 u32_to_i32(u32 u) { return std::bit_cast<i32>(u); }
-f32 u32_to_f32(u32 u) { return std::bit_cast<f32>(u); }
-u32 i32_to_u32(i32 i) { return std::bit_cast<u32>(i); }
-u32 f32_to_u32(f32 f) { return std::bit_cast<u32>(f); }
+i32 u32_to_i32(u32 u) { return *(i32*)&u; }
+f32 u32_to_f32(u32 u) { return *(f32*)&u; }
+u32 i32_to_u32(i32 i) { return *(u32*)&i; }
+u32 f32_to_u32(f32 f) { return *(u32*)&f; }
 
 static void interact_opynum(Loc a_loc, Lab op, u32 y, Tag y_type) {
   #define CASES_u32(a, b)                     \
@@ -565,7 +562,7 @@ static void interact_matsup(Loc mat_loc, Lab mat_len, Loc sup_loc) {
   set(port(1, ma0), term_new(SUB, 0, 0));
   set(port(1, ma1), term_new(SUB, 0, 0));
 
-  for (u32 i = 0; i < mat_len; i++) {
+  for (u64 i = 0; i < mat_len; i++) {
     Loc dui = alloc_node(2);
     set(port(1, dui),     term_new(SUB, 0, 0));
     set(port(2, dui),     term_new(SUB, 0, 0));
@@ -685,9 +682,9 @@ static int normal_step() {
   Term neg = take(loc + 0);
   Term pos = take(loc + 1);
 
+  char buf[10];
   // myprint("\n\n%04lX: INTERACT %s ~ %s\n\n", inc_itr(), tag_to_str(neg), tag_to_str(pos));
   /*
-  char buf[10];
   myprint(itoa(inc_itr(), buf, 16));
   myprint(": INTERACT ");
   myprint(tag_to_str(neg));
@@ -727,7 +724,7 @@ Term normalize(Term term) {
   if (term_tag(term) != REF) {
     myprint("normalizing non-ref\n");
     //exit(1);
-    return VOID_TERM;
+    return VOID;
   }
 
   boot(term_loc(term));
