@@ -1,7 +1,7 @@
 // HVM3 Core: single-thread, polarized, LAM/APP & DUP/SUP only
 
 #include <stdint.h>
-//#include <stdatomic.h>
+#include <stdatomic.h>
 #include <string.h>
 //#include <time.h>
 #include <system/soc.hpp>
@@ -57,8 +57,8 @@ typedef float    f32;
 #define OP_RSH 0x0F
 
 // Types
-typedef uint64_t a64;
-//typedef _Atomic(u64) a64;
+//typedef uint64_t a64;
+typedef _Atomic(u64) a64;
 
 // Global heap
 static a64 BUFF[1024];
@@ -135,27 +135,27 @@ Term term_offset_loc(Term term, Loc offset) {
 
 // Memory operations
 Term swap(Loc loc, Term term) {
-  //return atomic_exchange_explicit(&BUFF[loc], term, memory_order_relaxed);
-  Term ret = BUFF[loc];
-  BUFF[loc] = term;
-  return ret;
+  return atomic_exchange_explicit(&BUFF[loc], term, memory_order_relaxed);
+  // Term ret = BUFF[loc];
+  // BUFF[loc] = term;
+  // return ret;
 }
 
 Term get(Loc loc) {
-  //return atomic_load_explicit(&BUFF[loc], memory_order_relaxed);
-  return BUFF[loc];
+  return atomic_load_explicit(&BUFF[loc], memory_order_relaxed);
+  // return BUFF[loc];
 }
 
 Term take(Loc loc) {
-  //return atomic_exchange_explicit(&BUFF[loc], VOID, memory_order_relaxed);
-  Term ret = BUFF[loc];
-  BUFF[loc] = VOID;
-  return ret;
+  return atomic_exchange_explicit(&BUFF[loc], VOID, memory_order_relaxed);
+  // Term ret = BUFF[loc];
+  // BUFF[loc] = VOID;
+  // return ret;
 }
 
 void set(Loc loc, Term term) {
-  //atomic_store_explicit(&BUFF[loc], term, memory_order_relaxed);
-  BUFF[loc] = term;
+  atomic_store_explicit(&BUFF[loc], term, memory_order_relaxed);
+  // BUFF[loc] = term;
 }
 
 Loc port(u64 n, Loc x) {
@@ -392,10 +392,10 @@ static void interact_opynul(Loc a_loc) {
 
 // Utilities
 u32 u32_to_u32(u32 u) { return         u; }
-i32 u32_to_i32(u32 u) { return *(i32*)&u; }
-f32 u32_to_f32(u32 u) { return *(f32*)&u; }
-u32 i32_to_u32(i32 i) { return *(u32*)&i; }
-u32 f32_to_u32(f32 f) { return *(u32*)&f; }
+i32 u32_to_i32(u32 u) { return std::bit_cast<i32>(u); }
+f32 u32_to_f32(u32 u) { return std::bit_cast<f32>(u); }
+u32 i32_to_u32(i32 i) { return std::bit_cast<u32>(i); }
+u32 f32_to_u32(f32 f) { return std::bit_cast<u32>(f); }
 
 static void interact_opynum(Loc a_loc, Lab op, u32 y, Tag y_type) {
   #define CASES_u32(a, b)                     \
@@ -682,9 +682,9 @@ static int normal_step() {
   Term neg = take(loc + 0);
   Term pos = take(loc + 1);
 
-  char buf[10];
   // myprint("\n\n%04lX: INTERACT %s ~ %s\n\n", inc_itr(), tag_to_str(neg), tag_to_str(pos));
   /*
+  char buf[10];
   myprint(itoa(inc_itr(), buf, 16));
   myprint(": INTERACT ");
   myprint(tag_to_str(neg));
@@ -772,8 +772,8 @@ void dump_buff() {
     myprint(itoa(loc, buf, 16));
     myprint(" ");
     myprint(itoa(t_loc, buf, 16));
-    //myprint(" ");
-    //myprint(itoa(t_lab, buf, 16));
+    myprint(" ");
+    myprint(itoa(t_lab, buf, 16));
     myprint(" ");
     myprint(tag_to_str(t_tag));
     myprint("\n");
@@ -791,8 +791,8 @@ void dump_buff() {
     myprint(itoa(loc, buf, 16));
     myprint(" ");
     myprint(itoa(t_loc, buf, 16));
-    //myprint(" ");
-    //myprint(itoa(t_lab, buf, 16));
+    myprint(" ");
+    myprint(itoa(t_lab, buf, 16));
     myprint(" ");
     myprint(tag_to_str(t_tag));
     myprint("\n");
@@ -803,7 +803,7 @@ void dump_buff() {
 void print_node(Loc loc) {
   Term term = get(loc);
   Loc t_loc = term_loc(term);
-  Lab t_lab = term_lab(term);
+  // Lab t_lab = term_lab(term);
   Tag t_tag = term_tag(term);
   char buf[10];
 
