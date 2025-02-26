@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include "Runtime.c"
 
+unsigned int get_hart_id(void) {
+    unsigned int hartid;
+    asm volatile("csrr %0, mhartid" : "=r" (hartid));
+    return hartid;
+}
+
 // Definition: fib
 static Term fib_nodes[] = {
   0x0000000100000005,0x000000030000030F,0x0000000300000001,0x0000000000000002,
@@ -62,9 +68,25 @@ main()
 {
     using namespace std::chrono_literals;
 
+    a64* counter = (a64*)0xA0000000;
+    atomic_store(counter, 0);
+
     soc::init();
 
+    char buf[10];
     soc::uart.write(utils::to_bytes("Hello Vexii!\n"));
+
+    for(int i=0; i<10; i++) {
+      itoa(atomic_load(counter), buf, 10);
+      soc::uart.write(utils::to_bytes(buf));
+      soc::uart.write(utils::to_bytes("\n"));
+
+      atomic_fetch_add(counter, 1);
+    }
+
+    while(atomic_load(counter) < 20);
+
+    main_nodes[3] |= ((Term)get_hart_id()) << 34;
 
     hvm_init();
     BOOK.defs = definitions;
@@ -76,4 +98,5 @@ main()
     hvm_free();
 
     soc::uart.write(utils::to_bytes("Done!\n"));
+
 }
